@@ -239,7 +239,8 @@ func ensureRuntime(cfg *config, release, sumsSHA256 string) (string, error) {
 	}
 	ui := getUI()
 	client := newDownloadClient()
-	sums, err := releaseSumsForConfig(cfg, client, release, sumsSHA256)
+	defer client.CloseIdleConnections()
+	sums, err := releaseSumsForConfig(cfg, client, release, sumsSHA256, chooseProxyBypass)
 	if err != nil {
 		return "", fmt.Errorf("authenticating SHA256SUMS: %w", err)
 	}

@@ -80,11 +80,33 @@ func authenticateUpdateManifest(data, sigText []byte, publicKey ed25519.PublicKe
 	return &manifest, nil
 }
 
-func fetchSmallFile(client *http.Client, source string, limit int64) ([]byte, error) {
-	return fetchSmallFileContext(setupContext(), client, source, limit)
+func fetchSmallFile(client *http.Client, source string, limit int64, decisions ...proxyDecision) ([]byte, error) {
+	return fetchSmallFileContext(setupContext(), client, source, limit, decisions...)
 }
 
-func fetchSmallFileContext(ctx context.Context, client *http.Client, source string, limit int64) ([]byte, error) {
+func fetchSmallFileContext(ctx context.Context, client *http.Client, source string, limit int64, decisions ...proxyDecision) ([]byte, error) {
+	policy := newDownloadPolicy(client, source, firstProxyDecision(decisions))
+	defer policy.close()
+	data, err := fetchSmallFileAttempt(ctx, client, source, limit)
+	if err == nil {
+		return data, nil
+	}
+	approved, handled, choiceErr := policy.consider(ctx, err)
+	if !approved {
+		if handled {
+			return nil, choiceErr
+		}
+		return nil, err
+	}
+	data, err = fetchSmallFileAttempt(ctx, policy.client, source, limit)
+	logf("approved proxy retry for %s succeeded: %t", policy.label, err == nil)
+	if err != nil {
+		return nil, policy.failure(err)
+	}
+	return data, nil
+}
+
+func fetchSmallFileAttempt(ctx context.Context, client *http.Client, source string, limit int64) ([]byte, error) {
 	ctx, cancel := context.WithTimeout(ctx, 20*time.Second)
 	defer cancel()
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, source, nil)

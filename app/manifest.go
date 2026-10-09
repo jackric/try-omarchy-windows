@@ -28,7 +28,7 @@ var defaultSums []byte
 // releaseSums returns the embedded, authenticated manifest for the default
 // release. Custom release URLs still fetch a manifest and authenticate it
 // against the digest supplied by the caller.
-func releaseSums(client *http.Client, release, expectedSHA256 string) (map[string]string, error) {
+func releaseSums(client *http.Client, release, expectedSHA256 string, decisions ...proxyDecision) (map[string]string, error) {
 	embeddedDigest := sha256.Sum256(defaultSums)
 	embeddedSHA256 := hex.EncodeToString(embeddedDigest[:])
 	if normalizedRelease(release) == defaultReleaseURL &&
@@ -36,17 +36,17 @@ func releaseSums(client *http.Client, release, expectedSHA256 string) (map[strin
 		normalizedSHA256(defaultSumsSHA256) == embeddedSHA256 {
 		return parseVerifiedSums(defaultSums, defaultSumsSHA256)
 	}
-	return fetchSums(client, normalizedRelease(release), expectedSHA256)
+	return fetchSums(client, normalizedRelease(release), expectedSHA256, decisions...)
 }
 
 // fetchSums authenticates the release manifest against a digest embedded in
 // the launcher. Fetching checksums beside the payload without an independent
 // trust root would allow both to be replaced together.
-func fetchSums(client *http.Client, release, expectedSHA256 string) (map[string]string, error) {
+func fetchSums(client *http.Client, release, expectedSHA256 string, decisions ...proxyDecision) (map[string]string, error) {
 	if !validSHA256(normalizedSHA256(expectedSHA256)) {
 		return nil, fmt.Errorf("trusted SHA256SUMS digest is not a valid SHA256")
 	}
-	data, err := fetchSmallFile(client, release+"/SHA256SUMS", maxSumsBytes)
+	data, err := fetchSmallFile(client, release+"/SHA256SUMS", maxSumsBytes, decisions...)
 	if err != nil {
 		return nil, err
 	}

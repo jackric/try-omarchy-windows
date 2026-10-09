@@ -36,12 +36,19 @@ func TestWindowsProxyLookupCancellationDoesNotAccumulate(t *testing.T) {
 	for _, name := range []string{"HTTP_PROXY", "http_proxy", "HTTPS_PROXY", "https_proxy"} {
 		t.Setenv(name, "")
 	}
-	old := windowsDownloadProxy
+	old := windowsAutomaticProxy
+	oldRead := readWindowsProxySettings
+	readWindowsProxySettings = func() (windowsProxySettings, error) { return windowsProxySettings{autoDetect: true}, nil }
 	release := make(chan struct{})
 	entered := make(chan struct{})
 	finished := make(chan struct{})
-	windowsDownloadProxy = func(*url.URL) (*url.URL, error) { close(entered); <-release; close(finished); return nil, nil }
-	t.Cleanup(func() { close(release); <-finished; windowsDownloadProxy = old })
+	windowsAutomaticProxy = func(*url.URL, windowsProxySettings) (*url.URL, error) {
+		close(entered)
+		<-release
+		close(finished)
+		return nil, nil
+	}
+	t.Cleanup(func() { close(release); <-finished; windowsAutomaticProxy = old; readWindowsProxySettings = oldRead })
 	ctx, cancel := context.WithCancel(context.Background())
 	req, _ := http.NewRequestWithContext(ctx, http.MethodGet, "https://github.com/update", nil)
 	result := make(chan error, 1)

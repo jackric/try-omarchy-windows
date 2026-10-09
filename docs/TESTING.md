@@ -7,6 +7,26 @@ candidate against locally served, authenticated assets.
 For maintainer release rounds, use [the repeatable acceptance routine](RELEASE-ACCEPTANCE.md).
 The full checklist below supports deeper checks and additional hardware reports.
 
+## Automated download and proxy tests
+
+Windows Go tests start with empty proxy settings supplied through the
+`readWindowsProxySettings` test seam and clear inherited proxy environment
+variables before Go caches them. Fixture downloads therefore do not depend on
+the host's PAC, WPAD, or static proxy configuration. This isolation applies to
+child test executables used by native update tests as well. Production builds
+continue to read the current user's Windows settings.
+
+Proxy tests can patch `readWindowsProxySettings` to supply a static proxy or a
+local PAC URL, and patch `windowsAutomaticProxy` to simulate lookup failures or
+stalls. Restore patches with test cleanup after workers finish; tests that patch
+these globals must run sequentially. Native PAC integration tests supply their
+own local configuration and keep the real WinHTTP resolver.
+
+The attended `TestWindowsPACDownloadBypassMachine` is the explicit exception:
+its child process preserves the host's proxy configuration and environment when
+`TRYOMARCHY_UI_TEST=1` and `TRYOMARCHY_PROXY_BYPASS_MACHINE=1`. It requires the
+user to inspect and select the native warning dialog.
+
 ## Hardware testing
 
 Record the published baseline used for the test and the exact candidate hashes.

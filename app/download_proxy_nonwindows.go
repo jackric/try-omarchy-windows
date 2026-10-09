@@ -8,3 +8,5 @@ import (
 )
 
 func downloadProxy(req *http.Request) (*url.URL, error) { return http.ProxyFromEnvironment(req) }
+
+func downloadStaticProxy(req *http.Request) (*url.URL, error) { return http.ProxyFromEnvironment(req) }

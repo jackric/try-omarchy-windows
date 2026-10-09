@@ -27,6 +27,7 @@ const (
 type downloadProgress func(phase string, done, total int64)
 
 type downloadOptions struct {
+	decideProxy proxyDecision
 	ctx         context.Context
 	maxAttempts int
 	idleTimeout time.Duration
@@ -61,7 +62,7 @@ func downloadVerified(client *http.Client, url, dest, wantSum string, progress d
 	return downloadVerifiedWithOptions(client, url, dest, wantSum, progress, defaultDownloadOptions())
 }
 
-func downloadVerifiedWithOptions(client *http.Client, url, dest, wantSum string, progress downloadProgress, opts downloadOptions) error {
+func downloadVerifiedWithOptions(client *http.Client, url, dest, wantSum string, progress downloadProgress, opts downloadOptions) (resultErr error) {
 	wantSum = normalizedSHA256(wantSum)
 	if !validSHA256(wantSum) {
 		return fmt.Errorf("release manifest has no valid SHA256 for %s", filepath.Base(dest))
@@ -75,12 +76,30 @@ func downloadVerifiedWithOptions(client *http.Client, url, dest, wantSum string,
 	if opts.ctx == nil {
 		opts.ctx = setupContext()
 	}
+	policy := newDownloadPolicy(client, url, opts.decideProxy)
+	defer policy.close()
+	defer func() {
+		if policy.transport != nil {
+			logf("approved proxy retry for %s succeeded: %t", policy.label, resultErr == nil)
+		}
+		if resultErr != nil {
+			resultErr = policy.failure(resultErr)
+		}
+	}()
 	var lastErr error
 	cleanRestartUsed := false
 	for attempt := 1; attempt <= opts.maxAttempts; {
-		retry, cleanRestart, err := downloadAttemptContext(opts.ctx, client, url, dest, wantSum, progress, opts.idleTimeout)
+		retry, cleanRestart, err := downloadAttemptContext(opts.ctx, policy.client, url, dest, wantSum, progress, opts.idleTimeout)
 		if err == nil {
 			return nil
+		}
+		approved, handled, choiceErr := policy.consider(opts.ctx, err)
+		if approved {
+			attempt = 1
+			continue
+		}
+		if handled {
+			return choiceErr
 		}
 		if cleanRestart {
 			if cleanRestartUsed {

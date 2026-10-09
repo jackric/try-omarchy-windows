@@ -81,8 +81,9 @@ func ensureGuestFiles(cfg *config, release, sumsSHA256 string) error {
 
 	ui := getUI()
 	client := newDownloadClient()
+	defer client.CloseIdleConnections()
 
-	sums, err := releaseSumsForConfig(cfg, client, release, sumsSHA256)
+	sums, err := releaseSumsForConfig(cfg, client, release, sumsSHA256, chooseProxyBypass)
 	if err != nil {
 		return fmt.Errorf("authenticating SHA256SUMS: %w", err)
 	}
@@ -242,7 +243,9 @@ func removeCachedFile(path string) error {
 
 func download(client *http.Client, url, dest, wantSum string, ui *progressUI) error {
 	phase := ""
-	return downloadVerified(client, url, dest, wantSum, func(next string, done, total int64) {
+	opts := defaultDownloadOptions()
+	opts.decideProxy = chooseProxyBypass
+	return downloadVerifiedWithOptions(client, url, dest, wantSum, func(next string, done, total int64) {
 		if next != phase {
 			if next == downloadPhaseVerify {
 				ui.setStatus("%s", uiTextWith("status.checking_downloaded_file", map[string]string{"file": filepath.Base(dest)}))
@@ -252,7 +255,7 @@ func download(client *http.Client, url, dest, wantSum string, ui *progressUI) er
 		}
 		phase = next
 		ui.setProgress(done, total)
-	})
+	}, opts)
 }
 
 func decompress(src, dest, wantSum string, ui *progressUI) error {

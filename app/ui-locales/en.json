@@ -1,4 +1,10 @@
 {
+  "proxy.bypass.title": "Windows automatic proxy failed",
+  "proxy.bypass.explanation": "Windows could not resolve the automatic proxy configuration for this download:\n\n{file}\n\n{error}\n\nYou can retry and bypass Windows automatic proxy configuration for all downloads in this app session, including background downloads. Other explicit proxy settings still apply; otherwise Try Omarchy will connect directly.",
+  "proxy.bypass.warning": "Bypassing may violate your organisation's network access policy. Only continue if you are permitted to bypass this configuration.",
+  "proxy.bypass.scope": "This choice applies to all downloads until you close Try Omarchy. It does not change your Windows proxy settings and is not remembered for the next launch.",
+  "proxy.bypass.cancel": "Cancel download",
+  "proxy.bypass.approve": "Bypass for all downloads",
   "tray.menu.restart_update": "Restart to update",
   "update.notice.title": "Try Omarchy update",
   "update.notice.ready": "{version} is ready. Choose Restart to update, or it will be applied the next time you start Omarchy.",
